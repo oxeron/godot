@@ -1957,6 +1957,9 @@ DisplayServerEnums::WindowID DisplayServerWindows::create_sub_window(DisplayServ
 	if (p_flags & DisplayServerEnums::WINDOW_FLAG_SHARP_CORNERS_BIT) {
 		wd.sharp_corners = true;
 	}
+	if (p_flags & DisplayServerEnums::WINDOW_FLAG_SKIP_TASKBAR_BIT) {
+		wd.skip_taskbar = true;
+	}
 	if (p_flags & DisplayServerEnums::WINDOW_FLAG_NO_FOCUS_BIT) {
 		wd.no_focus = true;
 	}
@@ -3055,6 +3058,22 @@ void DisplayServerWindows::window_set_flag(DisplayServerEnums::WindowFlags p_fla
 			}
 			wd.is_popup = p_enabled;
 		} break;
+		case DisplayServerEnums::WINDOW_FLAG_SKIP_TASKBAR: {
+			if (wd.skip_taskbar != p_enabled) {
+				wd.skip_taskbar = p_enabled;
+				ITaskbarList *tbl = nullptr;
+				if (SUCCEEDED(CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER, IID_ITaskbarList, (LPVOID *)&tbl))) {
+					if (SUCCEEDED(tbl->HrInit())) {
+						if (p_enabled) {
+							tbl->DeleteTab(wd.hWnd);
+						} else {
+							tbl->AddTab(wd.hWnd);
+						}
+					}
+					SAFE_RELEASE(tbl)
+				}
+			}
+		} break;
 		default:
 			break;
 	}
@@ -3098,6 +3117,9 @@ bool DisplayServerWindows::window_get_flag(DisplayServerEnums::WindowFlags p_fla
 		} break;
 		case DisplayServerEnums::WINDOW_FLAG_POPUP: {
 			return wd.is_popup;
+		} break;
+		case DisplayServerEnums::WINDOW_FLAG_SKIP_TASKBAR: {
+			return wd.skip_taskbar;
 		} break;
 		default:
 			break;
@@ -7562,6 +7584,16 @@ Error DisplayServerWindows::_create_window(DisplayServerEnums::WindowID p_window
 		}
 
 		wd.no_redirection_bitmap = p_no_redirection_bitmap;
+
+		if (p_flags & DisplayServerEnums::WINDOW_FLAG_SKIP_TASKBAR_BIT) {
+			ITaskbarList *tbl = nullptr;
+			if (SUCCEEDED(CoCreateInstance(CLSID_TaskbarList, nullptr, CLSCTX_INPROC_SERVER, IID_ITaskbarList, (LPVOID *)&tbl))) {
+				if (SUCCEEDED(tbl->HrInit())) {
+					tbl->DeleteTab(wd.hWnd);
+				}
+				SAFE_RELEASE(tbl)
+			}
+		}
 
 		wd.create_completed = true;
 		// Set size of maximized borderless window (by default it covers the entire screen).
